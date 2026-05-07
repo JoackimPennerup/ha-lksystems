@@ -922,7 +922,9 @@ class LKCubicSensor(AbstractLkCubicSensor):
         """Get the latest state value."""
         if self._data_source == "configuration":
             if self._data_key in self._coordinator.data["cubic_configuration"]:
-                return self._coordinator.data["cubic_configuration"][self._data_key]
+                return self._convert_timestamp_value(
+                    self._coordinator.data["cubic_configuration"][self._data_key]
+                )
             elif "." in self._data_key:
                 keys = self._data_key.split(".")
                 value = self._coordinator.data["cubic_configuration"]
@@ -930,13 +932,15 @@ class LKCubicSensor(AbstractLkCubicSensor):
                     value = value.get(key, None)
                     if value is None:
                         return None
-                return value
+                return self._convert_timestamp_value(value)
             return None
         elif self._data_source == "measurement":
             _LOGGER.debug("Getting measurement for key: %s", self._data_key)
             _LOGGER.debug(self._coordinator.data["cubic_last_measurement"])
             if self._data_key in self._coordinator.data["cubic_last_measurement"]:
-                return self._coordinator.data["cubic_last_measurement"][self._data_key]
+                return self._convert_timestamp_value(
+                    self._coordinator.data["cubic_last_measurement"][self._data_key]
+                )
             elif "." in self._data_key:
                 keys = self._data_key.split(".")
                 value = self._coordinator.data["cubic_last_measurement"]
@@ -944,6 +948,22 @@ class LKCubicSensor(AbstractLkCubicSensor):
                     value = value.get(key, None)
                     if value is None:
                         return None
-                return value
+                return self._convert_timestamp_value(value)
 
         return None
+
+    def _convert_timestamp_value(self, value):
+        """Convert Unix timestamp values to datetime for timestamp sensors."""
+        if self._data_key in {"cacheUpdated", "leak.dateStartedAt", "leak.dateUpdatedAt"}:
+            if value is None:
+                return None
+            try:
+                return dt_util.utc_from_timestamp(float(value))
+            except (TypeError, ValueError):
+                _LOGGER.debug(
+                    "Could not convert timestamp value '%s' for key '%s'",
+                    value,
+                    self._data_key,
+                )
+                return None
+        return value

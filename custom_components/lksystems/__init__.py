@@ -9,7 +9,6 @@ import asyncio
 import base64
 import json
 from typing import Any, Dict
-import time
 
 # Make sure jwt is installed using: pip install pyjwt
 try:
@@ -189,9 +188,13 @@ class LKSystemCoordinator(DataUpdateCoordinator[LkStructureResp]):
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         """Initialize the coordinator."""
-        # Always convert to integer in case it comes as string from config
+        # Always convert to integer in case it comes as string from config.
+        # Keep the polling interval configurable, with 5 minutes as default.
         update_interval_minutes = int(
-            entry.data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
+            entry.options.get(
+                CONF_UPDATE_INTERVAL,
+                entry.data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
+            )
         )
 
         _LOGGER.warning(
@@ -574,40 +577,17 @@ class LKSystemCoordinator(DataUpdateCoordinator[LkStructureResp]):
                             # Try to get cubic measurements but don't fail if not available
                             try:
                                 if await lk_inst.get_cubic_secure_measurement(
-                                    device_identity
+                                    device_identity, force_update=True
                                 ):
                                     resp["cubic_last_messurement"] = (
                                         lk_inst.cubic_secure_messurement
                                     )
 
-                                if lk_inst.cubic_secure_messurement is not None:
-                                    # Get time as unix timestamp
-                                    timestamp = int(time.time())
-                                    if (
-                                        timestamp
-                                        - lk_inst.cubic_secure_messurement[
-                                            "cacheUpdated"
-                                        ]
-                                        > 3600
-                                    ):
-                                        _LOGGER.debug(
-                                            "Cubic secure measurement is older than 1 hour, force update"
-                                        )
-                                        if not await lk_inst.get_cubic_secure_measurement(
-                                            self._cubic_identity, force_update=True
-                                        ):
-                                            _LOGGER.error(
-                                                "Failed to get cubic secure measurement, abort update"
-                                            )
-                                            raise UpdateFailed(
-                                                "Unknown error get_cubic_secure_measurement"
-                                            )
-
                                 resp["cubic_last_measurement"] = (
                                     lk_inst.cubic_secure_messurement
                                 )
                                 if not await lk_inst.get_cubic_secure_configuration(
-                                    self._cubic_identity
+                                    self._cubic_identity, force_update=True
                                 ):
                                     _LOGGER.error(
                                         "Failed to get cubic secure configuration, abort update"
@@ -615,28 +595,6 @@ class LKSystemCoordinator(DataUpdateCoordinator[LkStructureResp]):
                                     raise UpdateFailed(
                                         "Unknown error get_cubic_secure_measurement"
                                     )
-                                if lk_inst.cubic_secure_configuration is not None:
-                                    # Get time as unix timestamp
-                                    timestamp = int(time.time())
-                                    if (
-                                        timestamp
-                                        - lk_inst.cubic_secure_configuration[
-                                            "cacheUpdated"
-                                        ]
-                                        > 3600
-                                    ):
-                                        _LOGGER.debug(
-                                            "Cubic secure configuration is older than 1 hour, force update"
-                                        )
-                                        if not await lk_inst.get_cubic_secure_configuration(
-                                            self._cubic_identity, force_update=True
-                                        ):
-                                            _LOGGER.error(
-                                                "Failed to get cubic secure configuration, abort update"
-                                            )
-                                            raise UpdateFailed(
-                                                "Unknown error get_cubic_secure_configuration"
-                                            )
 
                                 resp["cubic_configuration"] = (
                                     lk_inst.cubic_secure_configuration
